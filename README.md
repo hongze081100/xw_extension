@@ -13,7 +13,7 @@
 run the command
 
 ```shell
-$ cd my-react-extension
+$ cd xw-extension
 
 $ npm run dev
 ```
