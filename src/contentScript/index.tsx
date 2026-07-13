@@ -1,6 +1,6 @@
 console.info('contentScript is running')
-import { createReactMounter } from '@/utils/mounter';
-import { App, Button, ConfigProvider } from 'antd';
+import { createReactMounter } from '@/utils/mouter';
+import { App, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 
@@ -14,7 +14,7 @@ const mounter = createReactMounter({
   routes: [
     {
       path: () => true,
-      priority: 1,
+      priority: Number.MAX_SAFE_INTEGER,
       mounts: [
         {
           key: 'global',

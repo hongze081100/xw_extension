@@ -1,41 +1,6 @@
-import { createRoot, Root } from 'react-dom/client';
-import React, { ReactElement } from 'react';
-
-type Props = Record<string, any>;
-
-interface MountConfig {
-  select?: () => Element | Element[] | null | undefined;
-  selector?: string;
-  component: React.ComponentType<any>;
-  props?: Props;
-  getProps?: () => Props;
-  insert?: (container: HTMLElement, target: Element) => void;
-  key: string;
-  containerAttributes?: Record<string, any>;
-}
-
-type RouteMatcher = string | RegExp | ((url: URL) => boolean);
-
-export interface RouteConfig {
-  path: RouteMatcher;
-  mounts: MountConfig[];
-  priority?: number;
-}
-
-type AddProvider = (element: ReactElement) => ReactElement;
-
-interface MounterOptions {
-  routes: RouteConfig[];
-  debounceDelay?: number;
-  onRouteChange?: () => void;
-  addProvider?: AddProvider;
-}
-
-interface MountedInstance {
-  node: HTMLElement;
-  root: Root;
-  lastProps: Props;
-}
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { MountedInstance, MounterOptions, Props, RouteConfig, RouteMatcher } from './type';
 
 const matchRoutes = (routes: RouteConfig[]): RouteConfig[] => {
   const url = new URL(window.location.href);
