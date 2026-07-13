@@ -6,10 +6,10 @@ import {
   PK, 
   type DefineEnumItem, 
   type DefineEnumReturnType 
-} from './types';
+} from './type';
 
 // 统一导出所有类型，方便外部引入
-export * from './types';
+export * from './type';
 
 // ==================== 运行时工具函数 ====================
 
