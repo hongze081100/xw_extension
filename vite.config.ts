@@ -34,6 +34,13 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    css: {
+      preprocessorOptions: {
+        scss: {
+          api: 'modern-compiler', // 使用 modern API，消除旧版 API 弃用警告
+        },
+      },
+    },
     plugins: [
       crx({ manifest }), 
       react()

@@ -4,11 +4,11 @@ import { App, Button, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 
+import Home from './modules/Home';
+
 dayjs.locale('zh-cn');
 
 const COLOR_PRIMARY = '#1677ff';
-
-console.log('========test========');
 
 const mounter = createReactMounter({
   routes: [
@@ -19,11 +19,7 @@ const mounter = createReactMounter({
         {
           key: 'global',
           select: () => document.body,
-          component: () => {
-            return <Button onClick={() => {
-              console.log('test');
-            }}>test</Button>
-          }
+          component: Home,
         },
       ],
     }
