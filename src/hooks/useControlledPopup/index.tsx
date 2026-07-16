@@ -1,16 +1,14 @@
-
 import React, { ReactNode } from 'react';
-import { Drawer, Modal, DrawerProps, ModalProps } from 'antd';
-import { OpenPopup } from './type';
+import { Drawer, Modal } from 'antd';
 import { usePopup } from './usePopup';
+import { OpenDrawer, OpenModal } from './type';
 
-export function useControlledModal(): [OpenPopup, ReactNode] {
-  const { key, open, options, footerNode, childrenNode, openFn, handleAfterClose, handleCancel } = usePopup();
+export function useControlledModal(): [OpenModal, ReactNode] {
+  const { open, options, footerNode, childrenNode, openFn, handleAfterClose, handleCancel } = usePopup();
 
   const modalNode = options ? (
     <Modal
       {...options}
-      key={key}
       open={open}
       destroyOnHidden
       afterClose={handleAfterClose}
@@ -22,16 +20,15 @@ export function useControlledModal(): [OpenPopup, ReactNode] {
     </Modal>
   ) : null;
 
-  return [openFn as OpenPopup<ModalProps>, modalNode];
+  return [openFn as OpenModal, modalNode];
 }
 
-export function useControlledDrawer(): [OpenPopup<DrawerProps>, ReactNode] {
-  const { key, open, options, footerNode, childrenNode, openFn, handleAfterClose, handleCancel } = usePopup();
+export function useControlledDrawer(): [OpenDrawer, ReactNode] {
+  const { open, options, footerNode, childrenNode, openFn, handleAfterClose, handleCancel } = usePopup();
 
   const drawerNode = options ? (
     <Drawer
       {...(options as any)}
-      key={key}
       open={open}
       destroyOnHidden
       afterOpenChange={(isOpen) => !isOpen && handleAfterClose()}
@@ -42,5 +39,5 @@ export function useControlledDrawer(): [OpenPopup<DrawerProps>, ReactNode] {
     </Drawer>
   ) : null;
 
-  return [openFn as OpenPopup<DrawerProps>, drawerNode];
+  return [openFn as OpenDrawer, drawerNode];
 }

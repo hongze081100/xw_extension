@@ -1,5 +1,4 @@
-
-import React, { MutableRefObject, useCallback, useRef, useState } from 'react';
+import React, { MutableRefObject, useCallback, useMemo, useRef, useState } from 'react';
 import { ButtonProps, Button, Space } from 'antd';
 import { PopupOptions, ButtonAPI, PopupAPI } from './type';
 
@@ -20,11 +19,11 @@ const isFunction = (value: unknown): value is Function => {
 /**
  * 1. 将 Context 创建逻辑抽离，确保类型安全与闭包状态隔离
  */
-function createModalContext(childrenRef: MutableRefObject<any>, onUpdate: VoidFunction) {
+function createPopupContext(childrenRef: MutableRefObject<any>, onUpdate: VoidFunction) {
   // 使用对象存储状态，避免闭包陷阱，确保 API 读取到最新状态
   let state = {
     open: false,
-    options: null as PopupOptions<any> | null,
+    options: null as PopupOptions<any,any> | null,
     buttonMap: {} as any as Record<string, ButtonProps>,
   };
 
@@ -94,8 +93,8 @@ function createModalContext(childrenRef: MutableRefObject<any>, onUpdate: VoidFu
 
   return {
     getState: () => ({ ...state, api: buildApi() }),
-    openModal: <T extends readonly string[]>(opts: PopupOptions<T>) => {
-      const actions = opts.footerActions || (DEFAULT_FOOTER_ACTIONS as unknown as T);
+    openModal: (opts: PopupOptions<any, any>) => {
+      const actions = opts.footerActions || (DEFAULT_FOOTER_ACTIONS);
       const newButtonMap: Record<string, ButtonProps> = {};
 
       for (const key of actions) {
@@ -106,7 +105,7 @@ function createModalContext(childrenRef: MutableRefObject<any>, onUpdate: VoidFu
         };
       }
 
-      setState({ open: true, options: opts as PopupOptions<any>, buttonMap: newButtonMap });
+      setState({ open: true, options: opts as PopupOptions<any, any>, buttonMap: newButtonMap });
     },
     handleEvent: (key: string) => {
       const api = buildApi();
@@ -130,39 +129,39 @@ function createModalContext(childrenRef: MutableRefObject<any>, onUpdate: VoidFu
 }
 
 export function usePopup() {
-  const [key, setKey] = useState<number>(0);
   const [, forceUpdate] = useState({});
   const childrenRef = useRef<any>(null);
-  const contextRef = useRef<ReturnType<typeof createModalContext> | null>(null);
+  const contextRef = useRef<ReturnType<typeof createPopupContext> | null>(null);
 
   const openFn = useCallback((opts: PopupOptions<any, any>) => {
     // 每次打开都重新创建 Context，确保状态完全隔离且无内存泄漏
-    contextRef.current = createModalContext(childrenRef, () => forceUpdate({}));
+    contextRef.current = createPopupContext(childrenRef, () => forceUpdate({}));
     contextRef.current.openModal(opts);
-    setKey((key) => key + 1)
   }, []);
 
   const ctx = contextRef.current;
   const currentState = ctx?.getState();
   const { open, options, buttonMap, api } = currentState || {};
-  const footerActions = options?.footerActions || DEFAULT_FOOTER_ACTIONS;
+  const { footerActions: optFooterActions, footer } = options || {};
+  const footerActions = optFooterActions || DEFAULT_FOOTER_ACTIONS;
 
   // 3. Footer 渲染逻辑优化
-  const renderFooter = () => {
-    if (!options || options.footer === null || options.footer === false) return null;
-    if (isFunction(options.footer)) return options.footer(api!);
+  const footerNode = useMemo(() => {
+    if (footer === null || footer === false) return null;
+    if (isFunction(footer)) return footer(api!);
 
     return (
       <Space>
-        {footerActions.map((key, index) => {
+        {footerActions.map((key: string, index: number) => {
           const btnProps = buttonMap?.[key] || {};
           const isPrimary = index === footerActions.length - 1;
+          const handleClick = () => ctx?.handleEvent(key);
           return (
             <Button
               key={key}
               {...btnProps}
               type={btnProps.type || (isPrimary ? 'primary' : 'default')}
-              onClick={() => ctx?.handleEvent(key)}
+              onClick={handleClick}
             >
               {btnProps.children || buttonTextMap[key] || key}
             </Button>
@@ -170,9 +169,10 @@ export function usePopup() {
         })}
       </Space>
     );
-  };
+  }, [api, buttonMap, ctx, footer, footerActions]);
+
   const renderChildren = () => {
-    if (!options) { 
+    if (!options) {
       return null;
     }
     return isFunction(options.children) ? options.children(api!) : options.children;
@@ -181,13 +181,12 @@ export function usePopup() {
   const handleCancel = useCallback(() => ctx?.handleEvent('cancel'), [ctx]);
 
   return {
-    key,
     open,
     options,
     buttonMap,
     api,
     ctx,
-    footerNode: renderFooter(),
+    footerNode: options ? footerNode : null,
     childrenNode: renderChildren(),
     openFn,
     handleAfterClose,
