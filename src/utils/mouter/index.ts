@@ -1,6 +1,43 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { MountedInstance, MounterOptions, Props, RouteConfig, RouteMatcher } from './type';
+import { createRoot, Root } from 'react-dom/client';
+import React, { ReactElement } from 'react';
+
+type Props = Record<string, any>;
+
+interface MountConfig {
+  select?: () => Element | Element[] | null | undefined;
+  selector?: string;
+  component: React.ComponentType<any>;
+  props?: Props;
+  getProps?: () => Props;
+  getPropsForTarget?: (target: Element) => Props;
+  insert?: (container: HTMLElement, target: Element) => void;
+  key: string;
+  containerAttributes?: Record<string, any>;
+}
+
+type RouteMatcher = string | RegExp | ((url: URL) => boolean);
+
+export interface RouteConfig {
+  path: RouteMatcher;
+  mounts: MountConfig[];
+  priority?: number;
+}
+
+type AddProvider = (element: ReactElement) => ReactElement;
+
+interface MounterOptions {
+  routes: RouteConfig[];
+  debounceDelay?: number;
+  onRouteChange?: () => void;
+  addProvider?: AddProvider;
+}
+
+interface MountedInstance {
+  node: HTMLElement;
+  root: Root;
+  lastProps: Props;
+  target: HTMLElement;
+}
 
 const matchRoutes = (routes: RouteConfig[]): RouteConfig[] => {
   const url = new URL(window.location.href);
@@ -84,6 +121,17 @@ export const createReactMounter = (options: MounterOptions) => {
   } = options;
 
   const instances = new Map<string, MountedInstance>();
+  const elementIdMap = new WeakMap<HTMLElement, string>();
+  let elementIdCounter = 0;
+
+  const getElementId = (el: HTMLElement): string => {
+    const existing = elementIdMap.get(el);
+    if (existing) return existing;
+    const id = `el_${++elementIdCounter}`;
+    elementIdMap.set(el, id);
+    return id;
+  };
+
   let observer: MutationObserver | null = null;
   const cleanupFns: Array<() => void> = [];
 
@@ -115,6 +163,7 @@ export const createReactMounter = (options: MounterOptions) => {
     if (matchedRoutes.length === 0) return cleanupAllInstances();
 
     const activeKeys = new Set<string>();
+    const activeTargets = new Set<HTMLElement>();
 
     for (const route of matchedRoutes) {
       const pathname = window.location.pathname;
@@ -135,12 +184,17 @@ export const createReactMounter = (options: MounterOptions) => {
             : [];
 
         for (const target of nodes) {
-          activeKeys.add(mount.key);
+          activeTargets.add(target);
 
-          const existing = instances.get(mount.key);
+          const elementId = getElementId(target);
+          const instanceKey = `${mount.key}::${elementId}`;
+          activeKeys.add(instanceKey);
+
+          const existing = instances.get(instanceKey);
           const props = {
             ...mount.props,
             ...(typeof mount.getProps === 'function' ? mount.getProps() : {}),
+            ...(typeof mount.getPropsForTarget === 'function' ? mount.getPropsForTarget(target) : {}),
             $url: urlParams,
           };
 
@@ -175,14 +229,14 @@ export const createReactMounter = (options: MounterOptions) => {
           const root = createRoot(container);
           root.render(element);
 
-          instances.set(mount.key, { node: container, root, lastProps: props });
+          instances.set(instanceKey, { node: container, root, lastProps: props, target });
         }
       }
     }
 
     for (const key of instances.keys()) {
       const instance = instances.get(key)!;
-      if (!activeKeys.has(key) || document.body.contains(instance?.node) === false) {
+      if (!activeKeys.has(key) || !activeTargets.has(instance.target) || document.body.contains(instance.node) === false) {
         instance.root.unmount();
         if (instance.node.parentNode) {
           instance.node.parentNode.removeChild(instance.node);
@@ -202,8 +256,8 @@ export const createReactMounter = (options: MounterOptions) => {
 
     const patchHistory = (method: 'pushState' | 'replaceState') => {
       const original = window.history[method];
-      window.history[method] = function (this: any, data: any, unused: string, url?: string | URL | null) {
-        const result = original.call(this, data, unused, url);
+      window.history[method] = function (this: any, ...args: any[]) {
+        const result = original.apply(this, args);
         debouncedRender();
         return result;
       };
