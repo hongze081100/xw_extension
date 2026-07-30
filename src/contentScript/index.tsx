@@ -34,6 +34,9 @@ const mounter = createReactMounter({
       </>
     );
   },
+  onRouteChange() {
+    console.log('=====route change');
+  },
 });
 
 mounter.start();

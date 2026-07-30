@@ -1,5 +1,7 @@
 import { createRoot, Root } from 'react-dom/client';
 import React, { ReactElement } from 'react';
+import { createResourceManager } from '../ResourceManager';
+
 
 type Props = Record<string, any>;
 
@@ -32,86 +34,61 @@ interface MounterOptions {
   addProvider?: AddProvider;
 }
 
-interface MountedInstance {
-  node: HTMLElement;
-  root: Root;
-  lastProps: Props;
+// 1. 定义 React 挂载资源的“数据契约”
+interface ReactMountData {
+  component: React.ComponentType<any>;
+  props: Props;
   target: HTMLElement;
+  mountConfig: MountConfig;
 }
 
-const matchRoutes = (routes: RouteConfig[]): RouteConfig[] => {
-  const url = new URL(window.location.href);
-  return routes
-    .filter((route) => {
-      const { path } = route;
-      if (typeof path === 'string') return url.pathname === path;
-      if (path instanceof RegExp) return path.test(url.pathname);
-      if (typeof path === 'function') {
-        try {
-          return path(url) === true;
-        } catch (e) {
-          return false;
-        }
+// 2. 定义 React 挂载资源的“实例形态”
+interface ReactMountInstance {
+  node: HTMLElement;
+  root: Root;
+}
+
+// 3. 定义 React 挂载的生命周期（纯同步）
+const reactMountLifecycle = {
+  onCreate: (data: ReactMountData): ReactMountInstance => {
+    const { component, props, target, mountConfig } = data;
+    const container = document.createElement('div');
+
+    if (mountConfig.containerAttributes) {
+      const attrs = mountConfig.containerAttributes;
+      for (const key of Object.keys(attrs)) {
+        container.setAttribute(key, String(attrs[key]));
       }
-      return false;
-    })
-    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-};
-
-const extractUrlParams = (path: RouteMatcher, pathname: string): Props => {
-  if (path instanceof RegExp) {
-    const match = pathname.match(path);
-    return match?.groups ? { ...match.groups } : {};
-  }
-  return {};
-};
-
-const shallowEqual = (a: any, b: any): boolean => {
-  if (a === b) return true;
-  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) {
-    return false;
-  }
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-  if (keysA.length !== keysB.length) return false;
-  for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(b, key) || a[key] !== b[key]) {
-      return false;
-    }
-  }
-  return true;
-};
-
-const propsEqual = (a: Props, b: Props): boolean => {
-  if (a === b) return true;
-  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) {
-    return false;
-  }
-
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-  if (keysA.length !== keysB.length) return false;
-
-  for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(b, key)) {
-      return false;
     }
 
-    const valA = a[key];
-    const valB = b[key];
+    if (typeof mountConfig.insert === 'function') {
+      mountConfig.insert(container, target);
+    } else {
+      target.appendChild(container);
+    }
 
-    if (key === '$url') {
-      if (!shallowEqual(valA, valB)) {
-        return false;
-      }
-    } else if (valA !== valB) {
-      return false;
+    const root = createRoot(container);
+    root.render(React.createElement(component, props));
+
+    return { node: container, root };
+  },
+
+  onUpdate: (instance: ReactMountInstance, data: ReactMountData) => {
+    // 仅当 Props 发生变化时重新渲染
+    // 注意：这里可以复用你之前的 propsEqual 逻辑
+    // 为了极简，这里直接 render，React 内部也会做 diff
+    instance.root.render(React.createElement(data.component, data.props));
+  },
+
+  onDestroy: (instance: ReactMountInstance) => {
+    instance.root.unmount();
+    if (instance.node.parentNode) {
+      instance.node.parentNode.removeChild(instance.node);
     }
   }
-
-  return true;
 };
 
+// 4. 重构后的 Mounter 工厂函数
 export const createReactMounter = (options: MounterOptions) => {
   const {
     routes,
@@ -120,10 +97,18 @@ export const createReactMounter = (options: MounterOptions) => {
     addProvider,
   } = options;
 
-  const instances = new Map<string, MountedInstance>();
+  // 使用 ResourceManager 管理 React 实例
+  const manager = createResourceManager<ReactMountData, ReactMountInstance>(
+    reactMountLifecycle,
+    {
+      // 使用 mount.key + target 的唯一标识作为 Hash
+      hashFn: (data) => `${data.mountConfig.key}::${getElementId(data.target)}`
+    }
+  );
+
+  // 复用之前的 DOM ID 生成逻辑（WeakMap 防止内存泄漏）
   const elementIdMap = new WeakMap<HTMLElement, string>();
   let elementIdCounter = 0;
-
   const getElementId = (el: HTMLElement): string => {
     const existing = elementIdMap.get(el);
     if (existing) return existing;
@@ -132,65 +117,51 @@ export const createReactMounter = (options: MounterOptions) => {
     return id;
   };
 
-  let observer: MutationObserver | null = null;
-  const cleanupFns: Array<() => void> = [];
-
-  const debounce = <T extends (...args: any[]) => void>(
-    fn: T,
-    delay: number
-  ) => {
-    let timeoutId: number | null = null;
-    return ((...args: any[]) => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => fn(...args), delay) as unknown as number;
-    }) as T;
-  };
-
-  const cleanupAllInstances = () => {
-    for (const [, instance] of instances) {
-      try {
-        instance.root.unmount();
-        if (instance.node.parentNode) {
-          instance.node.parentNode.removeChild(instance.node);
+  // 复用路由匹配与 URL 参数提取
+  const matchRoutes = (routes: RouteConfig[]): RouteConfig[] => {
+    const url = new URL(window.location.href);
+    return routes
+      .filter((route) => {
+        const { path } = route;
+        if (typeof path === 'string') return url.pathname === path;
+        if (path instanceof RegExp) return path.test(url.pathname);
+        if (typeof path === 'function') {
+          try { return path(url) === true; } catch (e) { return false; }
         }
-      } catch (e) { }
-    }
-    instances.clear();
+        return false;
+      })
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   };
 
+  const extractUrlParams = (path: RouteMatcher, pathname: string): Props => {
+    if (path instanceof RegExp) {
+      const match = pathname.match(path);
+      return match?.groups ? { ...match.groups } : {};
+    }
+    return {};
+  };
+
+  // 核心渲染逻辑被极度简化
   const render = () => {
     const matchedRoutes = matchRoutes(routes);
-    if (matchedRoutes.length === 0) return cleanupAllInstances();
-
-    const activeKeys = new Set<string>();
-    const activeTargets = new Set<HTMLElement>();
+    const pathname = window.location.pathname;
+    
+    // 收集当前需要挂载的所有 React 资源
+    const resourcesToMount: ReactMountData[] = [];
 
     for (const route of matchedRoutes) {
-      const pathname = window.location.pathname;
       const urlParams = extractUrlParams(route.path, pathname);
 
       for (const mount of route.mounts) {
-        if (!mount.select && !mount.selector) {
-          continue;
-        }
+        if (!mount.select && !mount.selector) continue;
 
-        const selectFn =
-          mount.select || (() => document.querySelector(mount.selector!));
+        const selectFn = mount.select || (() => document.querySelector(mount.selector!));
         const rawNodes = selectFn();
         const nodes = Array.isArray(rawNodes)
           ? rawNodes.filter((n): n is HTMLElement => n instanceof HTMLElement)
-          : rawNodes instanceof HTMLElement
-            ? [rawNodes]
-            : [];
+          : rawNodes instanceof HTMLElement ? [rawNodes] : [];
 
         for (const target of nodes) {
-          activeTargets.add(target);
-
-          const elementId = getElementId(target);
-          const instanceKey = `${mount.key}::${elementId}`;
-          activeKeys.add(instanceKey);
-
-          const existing = instances.get(instanceKey);
           const props = {
             ...mount.props,
             ...(typeof mount.getProps === 'function' ? mount.getProps() : {}),
@@ -201,59 +172,37 @@ export const createReactMounter = (options: MounterOptions) => {
           let element = React.createElement(mount.component, props);
           element = addProvider ? addProvider(element) : element;
 
-          if (existing) {
-            if (!propsEqual(existing.lastProps, props)) {
-              existing.lastProps = props;
-              existing.root.render(element);
-            }
-            continue;
-          }
-
-          const container = document.createElement('div');
-
-          if (mount.containerAttributes) {
-            const attrs = mount.containerAttributes;
-            const keys = Object.keys(attrs);
-            for (let i = 0; i < keys.length; i++) {
-              const key = keys[i];
-              container.setAttribute(key, String(attrs[key]));
-            }
-          }
-
-          if (typeof mount.insert === 'function') {
-            mount.insert(container, target);
-          } else {
-            target.appendChild(container);
-          }
-
-          const root = createRoot(container);
-          root.render(element);
-
-          instances.set(instanceKey, { node: container, root, lastProps: props, target });
+          resourcesToMount.push({
+            component: mount.component,
+            props, // 传入处理后的 props
+            target,
+            mountConfig: mount,
+          });
         }
       }
     }
 
-    for (const key of instances.keys()) {
-      const instance = instances.get(key)!;
-      if (!activeKeys.has(key) || !activeTargets.has(instance.target) || document.body.contains(instance.node) === false) {
-        instance.root.unmount();
-        if (instance.node.parentNode) {
-          instance.node.parentNode.removeChild(instance.node);
-        }
-        instances.delete(key);
-      }
-    }
+    // 将收集到的资源列表交给 Manager，它会自动处理 创建/更新/销毁
+    manager.update(resourcesToMount);
 
     if (onRouteChange) onRouteChange();
   };
 
+  // 防抖与事件监听逻辑保持不变
+  const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
+    let timeoutId: number | null = null;
+    return ((...args: any[]) => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => fn(...args), delay) as unknown as number;
+    }) as T;
+  };
+
   const debouncedRender = debounce(render, debounceDelay);
+  const cleanupFns: Array<() => void> = [];
 
   const setupRouteListeners = () => {
     const onPopState = () => debouncedRender();
     const onHashChange = () => debouncedRender();
-
     const patchHistory = (method: 'pushState' | 'replaceState') => {
       const original = window.history[method];
       window.history[method] = function (this: any, ...args: any[]) {
@@ -267,7 +216,6 @@ export const createReactMounter = (options: MounterOptions) => {
     window.addEventListener('hashchange', onHashChange);
     patchHistory('pushState');
     patchHistory('replaceState');
-
     cleanupFns.push(() => {
       window.removeEventListener('popstate', onPopState);
       window.removeEventListener('hashchange', onHashChange);
@@ -275,9 +223,9 @@ export const createReactMounter = (options: MounterOptions) => {
   };
 
   const setupMutationObserver = () => {
-    observer = new MutationObserver(debouncedRender);
+    const observer = new MutationObserver(debouncedRender);
     observer.observe(document.body, { childList: true, subtree: true });
-    cleanupFns.push(() => observer?.disconnect());
+    cleanupFns.push(() => observer.disconnect());
   };
 
   const start = () => {
@@ -287,14 +235,9 @@ export const createReactMounter = (options: MounterOptions) => {
   };
 
   const destroy = () => {
-    cleanupAllInstances();
+    manager.update([]); // 传入空数组，触发全量销毁
     cleanupFns.forEach((fn) => fn());
   };
 
-  return {
-    start,
-    destroy,
-    rerender: debouncedRender,
-    instances,
-  };
+  return { start, destroy, rerender: debouncedRender };
 };
