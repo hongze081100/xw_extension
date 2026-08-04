@@ -14,7 +14,7 @@ export const createModuleManager = (options: ModuleManagerOptions) => {
     addProvider,
   } = options;
 
-  const hashFn = (data: ModuleResourceData) => `${data.key}::${data.targetNode.dataset.mountId}`;
+  const hashFn = (data: ModuleResourceData) => `${data.targetNode.dataset.mountId}::${data.key}`;
 
   const createController = createGlobalResourceManager<ModuleResourceData, ModuleResourceInstance>(
     {
