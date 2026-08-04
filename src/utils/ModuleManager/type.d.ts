@@ -16,7 +16,7 @@ export interface ModuleInfo {
   // 组件类型，用于创建 React 元素
   component: ComponentType<Props>;
   // 挂载参数，支持静态对象或动态计算函数
-  props: Props | ((targetNode: Element) => Props);
+  props?: Props | ((targetNode: Element) => Props);
   // 资源唯一标识键，用于区分同一目标节点上的不同挂载实例
   key: string;
 }
@@ -39,6 +39,11 @@ export interface ModuleManagerOptions {
   debounceDelay?: number;
   // 路由变化后的回调钩子
   onRouteChange?: () => void;
+  /**
+   * 全局 Provider 包装函数
+   * 用于为所有注入的组件提供统一的全局上下文（如 Ant Design ConfigProvider、Redux Provider 等）
+   */
+  addProvider?: (children: ReactNode) => ReactNode;
 }
 
 // 资源管理器所需的数据结构
@@ -54,4 +59,6 @@ export interface ModuleResourceInstance {
   targetNode: HTMLElement;
   container: HTMLElement;
   root: Root;
+  lastComponent: ComponentType<any>;
+  lastProps: Props;
 }

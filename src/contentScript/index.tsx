@@ -1,5 +1,5 @@
 console.info('contentScript is running')
-import { createModuleManager } from '@/utils/mouter';
+import { createModuleManager } from '@/utils/ModuleManager';
 import { App, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
@@ -18,19 +18,22 @@ const mounter = createModuleManager({
       modules: [
         {
           key: 'global',
-          select: () => document.body,
-          component: (props: any) => (
-            <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: COLOR_PRIMARY, colorInfo: COLOR_PRIMARY, zIndexPopupBase: 1000001 } }}>
-              <App>
-                <Home {...props} />
-              </App>
-            </ConfigProvider>
-          ),
+          target: () => document.body,
+          component: Home,
         },
       ],
     }
   ],
   debounceDelay: 150,
+  addProvider: (children) => {
+    return (
+      <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: COLOR_PRIMARY, colorInfo: COLOR_PRIMARY, zIndexPopupBase: 1000001 } }}>
+        <App>
+          {children}
+        </App>
+      </ConfigProvider>
+    );
+  },
   onRouteChange() {
     console.log('=====route change');
   },
