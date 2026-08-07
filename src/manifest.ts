@@ -1,14 +1,17 @@
-import { defineManifest } from '@crxjs/vite-plugin'
 import packageData from '../package.json'
 
-//@ts-ignore
-const isDev = process.env.NODE_ENV == 'development'
+const isDev = process.env.NODE_ENV === 'development'
 
-export default defineManifest({
-  name: `${packageData.displayName || packageData.name}${isDev ? ` ➡️ Dev` : ''}`,
+/**
+ * Chrome Extension Manifest V3 配置
+ *
+ * 注意：这里的路径是源码路径，manifestPlugin 会在构建时映射为实际产物路径
+ */
+const manifest = {
+  name: `${packageData.displayName || packageData.name}${isDev ? ' ➡️ Dev' : ''}`,
   description: packageData.description,
   version: packageData.version,
-  manifest_version: 3,
+  manifest_version: 3 as const,
   icons: {
     16: 'img/logo-16.png',
     32: 'img/logo-32.png',
@@ -21,19 +24,22 @@ export default defineManifest({
   },
   background: {
     service_worker: 'src/background/index.ts',
-    type: 'module',
+    type: 'module' as const,
   },
   content_scripts: [
     {
       matches: ['<all_urls>'],
-      js: ['src/contentScript/index.tsx'],
+      js: ['src/inject/index.tsx'],
+      run_at: 'document_start' as const,
     },
   ],
   web_accessible_resources: [
     {
-      resources: ['img/logo-16.png', 'img/logo-32.png', 'img/logo-48.png', 'img/logo-128.png'],
-      matches: [],
+      "matches": [ "<all_urls>" ],
+      "resources": [ "*.js", "*.css" ]
     },
   ],
   permissions: ['sidePanel', 'storage'],
-})
+}
+
+export default manifest

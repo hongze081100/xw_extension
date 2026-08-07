@@ -1,56 +1,66 @@
 import { defineConfig } from 'vite'
-import { crx } from '@crxjs/vite-plugin'
-import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
-// import makeManifestPlugin from './utils/plugins/make-manifest-plugin';
-// import { watchRebuildPlugin } from '@chrome-extension-boilerplate/hmr';
-// import viteObfuscateFile from 'vite-plugin-javascript-obfuscator';
+import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
+import { manifestPlugin } from './src/plugins/manifest-plugin'
 
-import manifest from './src/manifest';
-
-const rootDir = resolve(__dirname);
-const srcDir = resolve(__dirname, 'src');
+const rootDir = resolve(__dirname)
+const srcDir = resolve(rootDir, 'src')
+const outDir = resolve(rootDir, 'build')
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  return {
-    resolve: {
-      alias: {
-        '@': srcDir,
-      },
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@': srcDir,
     },
-    publicDir: resolve(rootDir, 'public'),
-    build: {
-      emptyOutDir: true,
-      outDir: 'build',
-      // minify: false,
-      // reportCompressedSize: true, // 默认为 true
-      // modulePreload: true,
-      // sourcemap: true
-      rollupOptions: {
-        // external: ['chrome'],
-        output: {
-          chunkFileNames: 'assets/chunk-[hash].js',
+  },
+  publicDir: resolve(rootDir, 'public'),
+  base: './',
+  build: {
+    emptyOutDir: true,
+    outDir,
+    cssCodeSplit: true,
+    rollupOptions: {
+      input: {
+        background: resolve(srcDir, 'background/index.ts'),
+        inject: resolve(srcDir, 'inject/index.tsx'),
+        content: resolve(srcDir, 'pages/content.tsx'),
+        injectData: resolve(srcDir, 'pages/injectData.tsx'),
+        popup: resolve(rootDir, 'popup.html'),
+      },
+      output: {
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          const name = assetInfo.name || ''
+          if (name.endsWith('.css')) return 'assets/[name][extname]'
+          return 'assets/[name]-[hash][extname]'
+        },
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('antd') || id.includes('@ant-design') || id.includes('dayjs')) {
+              return 'vendor-antd'
+            }
+            if (id.includes('react') || id.includes('scheduler')) {
+              return 'vendor-react'
+            }
+          }
         },
       },
     },
-    css: {
-      preprocessorOptions: {
-        scss: {
-          api: 'modern-compiler', // 使用 modern API，消除旧版 API 弃用警告
-        },
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler',
       },
     },
-    plugins: [
-      crx({ manifest }), 
-      react()
-    ],
-    legacy: {
-      skipWebSocketTokenCheck: true,
-    },
-    optimizeDeps: {
-      force: true, // 强制重新预构建依赖
-    },
-  }
+  },
+  plugins: [react(), manifestPlugin(outDir)],
+  legacy: {
+    skipWebSocketTokenCheck: true,
+  },
+  optimizeDeps: {
+    force: true,
+  },
 })
-

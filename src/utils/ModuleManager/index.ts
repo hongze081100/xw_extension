@@ -156,7 +156,23 @@ export const createModuleManager = (options: ModuleManagerOptions) => {
       if (isSyncing) return;
       debouncedRender();
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+
+    const observeBody = () => {
+      if (!document.body) {
+        // document_start 时机 body 可能还没创建，等 DOM 就绪后再 observe
+        const handler = () => {
+          if (document.body) {
+            document.removeEventListener('DOMContentLoaded', handler);
+            observer.observe(document.body, { childList: true, subtree: true });
+          }
+        };
+        document.addEventListener('DOMContentLoaded', handler);
+        return;
+      }
+      observer.observe(document.body, { childList: true, subtree: true });
+    };
+
+    observeBody();
     cleanupFns.push(() => observer.disconnect());
   };
 
