@@ -31,26 +31,26 @@ export const createModuleManager = (options: ModuleManagerOptions) => {
         root.render(element);
         return { targetNode, container, root, lastComponent: component, lastProps: props };
       },
-      onUpdate: (instance, newData) => {
-        const { component, props } = newData;
+      // onUpdate: (instance, newData) => {
+      //   const { component, props } = newData;
         
-        // 浅比较拦截：如果组件和 Props 未变，跳过渲染
-        if (
-          instance.lastComponent === component && 
-          shallowEqual(instance.lastProps, props)
-        ) {
-          return; 
-        }
+      //   // 浅比较拦截：如果组件和 Props 未变，跳过渲染
+      //   if (
+      //     instance.lastComponent === component && 
+      //     shallowEqual(instance.lastProps, props)
+      //   ) {
+      //     return; 
+      //   }
 
-        // 更新缓存
-        instance.lastComponent = component;
-        instance.lastProps = props;
+      //   // 更新缓存
+      //   instance.lastComponent = component;
+      //   instance.lastProps = props;
         
-        let element: ReactNode = createElement(component, props);
-        if (addProvider) element = addProvider(element);
+      //   let element: ReactNode = createElement(component, props);
+      //   if (addProvider) element = addProvider(element);
         
-        instance.root.render(element);
-      },
+      //   instance.root.render(element);
+      // },
       onDestroy: (instance) => {
         try {
           instance.root.unmount();
@@ -127,6 +127,7 @@ export const createModuleManager = (options: ModuleManagerOptions) => {
       const original = window.history[method];
       
       window.history[method] = function (this: any, ...args: any[]) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         const result = original?.apply(this, args);
         window.dispatchEvent(new Event('mounter:routechange'));
         return result;

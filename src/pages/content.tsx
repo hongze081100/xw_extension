@@ -34,9 +34,9 @@ const mounter = createModuleManager({
       </ConfigProvider>
     );
   },
-  onRouteChange() {
-    console.log('=====route change');
-  },
+  // onRouteChange() {
+  //   console.log('=====route change');
+  // },
 });
 
 mounter.start();
