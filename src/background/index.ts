@@ -1,7 +1,15 @@
-console.log('background is running')
+import { BACKGROUND_REQUEST_EVENT, PAGE_RESPONSE_EVENT } from '@/constants/events';
+import { ChromeBridge, type ChromeBridgeHandler } from './ChromeBridge';
+import * as pageBridgeRequestHandlers from './pageBridgeRequestHandlers';
 
-chrome.runtime.onMessage.addListener((request) => {
-  if (request.type === 'COUNT') {
-    console.log('background has received a message from popup, and count is ', request?.count)
+export const pageBridge = new ChromeBridge({
+  source: 'page',
+  requestEvent: BACKGROUND_REQUEST_EVENT,
+  responseEvent: PAGE_RESPONSE_EVENT,
+});
+
+for (const [action, handler] of Object.entries(pageBridgeRequestHandlers)) {
+  if (typeof handler === 'function') {
+    pageBridge.register(action, handler as ChromeBridgeHandler);
   }
-})
+}

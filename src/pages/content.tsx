@@ -5,8 +5,12 @@ import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 
 import Home from './modules/Home';
+import installBackgroundBridge from '@/utils/Bridge/installBackgroundBridge';
 
 dayjs.locale('zh-cn');
+
+const backgroundBridge = installBackgroundBridge();
+void backgroundBridge;
 
 const COLOR_PRIMARY = '#1677ff';
 
@@ -39,4 +43,6 @@ const mounter = createModuleManager({
   // },
 });
 
-mounter.start();
+document.removeEventListener('DOMContentLoaded', () => {
+  mounter.start();
+});

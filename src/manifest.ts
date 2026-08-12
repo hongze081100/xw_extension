@@ -39,7 +39,7 @@ const manifest = {
       "resources": [ "*.js", "*.css" ]
     },
   ],
-  permissions: ['sidePanel', 'storage'],
+  permissions: ['sidePanel', 'storage', 'scripting'],
 }
 
 export default manifest
