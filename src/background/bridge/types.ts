@@ -15,13 +15,13 @@ export type BridgeHandler = _BridgeHandler;
  * 与页面侧 {@link BridgeHandler} 不同，这里不接收 action 名，
  * 但额外接收 sender 以便定位调用来源。
  */
-export type BackgroundActionHandler = (
+export type BackgroundBridgeHandler = (
   args: unknown[] | undefined,
   sender: chrome.runtime.MessageSender,
 ) => unknown | Promise<unknown>;
 
 /** 进行中的后台 → 页面 调用，按 actionId 配对响应 */
-export interface PendingBackgroundAction {
+export interface PendingAction {
   action: string;
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;

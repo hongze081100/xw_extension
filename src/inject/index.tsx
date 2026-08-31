@@ -1,4 +1,4 @@
-import installInjectBridge from './bridge';
+import { installInjectBridge } from './bridge';
 
 function injectScript(path: string, searchParams?: URLSearchParams) {
   const script = document.createElement("script");
@@ -16,9 +16,7 @@ function injectCSS(path: string) {
   (document.head || document.documentElement).appendChild(link);
 }
 
-const injectBridge = installInjectBridge();
+installInjectBridge();
 
 injectCSS("assets/content.css");
 injectScript("assets/content.js");
-
-void injectBridge;

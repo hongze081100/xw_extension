@@ -1,11 +1,11 @@
 import { generateActionId } from '@/utils/helper';
 import type {
-  BackgroundActionHandler,
+  BackgroundBridgeHandler,
   BridgeRequest,
   BridgeResponse,
   DispatchBackgroundActionOptions,
   InjectedBridgePayload,
-  PendingBackgroundAction,
+  PendingAction,
   PromiseResult,
 } from './types';
 
@@ -16,20 +16,20 @@ import {
 } from './constants';
 
 /** 后台 Action 处理器注册表，按 action 名分发 */
-const backgroundActionHandlers = new Map<string, BackgroundActionHandler>();
+const backgroundBridgeHandlers = new Map<string, BackgroundBridgeHandler>();
 
 /** 进行中的后台 → 页面 调用，按 actionId 配对响应 */
-const pendingBackgroundActionMap = new Map<string, PendingBackgroundAction>();
+const pendingActionMap = new Map<string, PendingAction>();
 
 /**
  * 注册后台 Action 处理器。页面通过 page_action_request 调用时，
  * 将按 action 名查找并执行对应 handler。
  */
-export function registerBackgroundHandler(
+export function registerBackgroundBridgeHandler(
   action: string,
-  handler: BackgroundActionHandler,
+  handler: BackgroundBridgeHandler,
 ): void {
-  backgroundActionHandlers.set(action, handler);
+  backgroundBridgeHandlers.set(action, handler);
 }
 
 
@@ -42,6 +42,7 @@ export function handlePageActionRequest(
   request: BridgeRequest,
   sender: chrome.runtime.MessageSender,
 ): void {
+  console.log('====handlePageActionRequest', request);
   const { action, actionId, args } = request;
 
   /** 将结果回执到页面 */
@@ -50,7 +51,7 @@ export function handlePageActionRequest(
     dispatchEventToSender(sender, PAGE_ACTION_RESPONSE_EVENT, payload);
   };
 
-  const handler = backgroundActionHandlers.get(action);
+  const handler = backgroundBridgeHandlers.get(action);
   if (!handler) {
     respond('reject', `未找到方法 ${action}`);
     return;
@@ -80,17 +81,20 @@ function dispatchEventToSender(
   if ((sender.frameId ?? 0) > 0) {
     target.frameIds = [sender.frameId as number];
   }
-
+  console.log('====dispatchEventToSender', target, eventName, data);
   chrome.scripting
     .executeScript({
       target,
       world: 'MAIN',
       func: (eventName: string, data: InjectedBridgePayload) => {
+        console.log('====dispatchEventToSender', eventName, data);
         window.dispatchEvent(new CustomEvent(eventName, { detail: data }));
       },
       args: [eventName, data],
     })
-    .catch(() => {});
+    .catch((e) => {
+      console.error('====dispatchEventToSender error', e);
+    });
 }
 
 /**
@@ -121,11 +125,11 @@ export function dispatchBackgroundActionRequest(
 
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      pendingBackgroundActionMap.delete(actionId);
+      pendingActionMap.delete(actionId);
       reject(new Error(`${action} 调用超时`));
     }, timeout);
 
-    pendingBackgroundActionMap.set(actionId, { action, resolve, reject, timeoutId });
+    pendingActionMap.set(actionId, { action, resolve, reject, timeoutId });
 
     chrome.scripting
       .executeScript({
@@ -137,7 +141,7 @@ export function dispatchBackgroundActionRequest(
         args: [BACKGROUND_ACTION_REQUEST_EVENT, request],
       })
       .catch((err: unknown) => {
-        pendingBackgroundActionMap.delete(actionId);
+        pendingActionMap.delete(actionId);
         clearTimeout(timeoutId);
         reject(err instanceof Error ? err : new Error(String(err)));
       });
@@ -149,10 +153,10 @@ export function dispatchBackgroundActionRequest(
  */
 export function handleBackgroundActionResponse(response: BridgeResponse): void {
   const { actionId, result, promiseResult } = response;
-  const pending = pendingBackgroundActionMap.get(actionId);
+  const pending = pendingActionMap.get(actionId);
   if (!pending) return;
 
-  pendingBackgroundActionMap.delete(actionId);
+  pendingActionMap.delete(actionId);
   clearTimeout(pending.timeoutId);
 
   if (promiseResult === 'resolve') {

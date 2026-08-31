@@ -15,10 +15,10 @@ import {
 } from './constants';
 
 
-const pendingPageActionMap = new Map<string, PendingPageAction>();
+const pendingActionMap = new Map<string, PendingPageAction>();
 
 /** 后台 → 页面 请求的处理器注册表，按 action 名分发 */
-const backgroundActionHandlers = new Map<string, BridgeHandler>();
+const bridgeHandlers = new Map<string, BridgeHandler>();
 
 /**
  * 处理后台返回的响应：根据 actionId 找到对应的 pending promise 并结算。
@@ -31,9 +31,9 @@ function handlePageActionResponse(e: Event): void {
   const { actionId, result, promiseResult } = detail;
   if (!actionId) return;
 
-  const pending = pendingPageActionMap.get(actionId);
+  const pending = pendingActionMap.get(actionId);
   if (!pending) return;
-  pendingPageActionMap.delete(actionId);
+  pendingActionMap.delete(actionId);
   clearTimeout(pending.timeoutId);
 
   if (promiseResult === 'resolve') {
@@ -54,7 +54,7 @@ function handleBackgroundActionRequest(e: Event): void {
   const { actionId, action, args } = detail;
   if (!actionId || !action) return;
 
-  const handler = backgroundActionHandlers.get(action);
+  const handler = bridgeHandlers.get(action);
 
   /** 将结果以事件形式回执给后台 */
   const reply = (promiseResult: PromiseResult, result: unknown) => {
@@ -95,25 +95,25 @@ export function dispatchPageActionRequest(
   window.dispatchEvent(
     new CustomEvent(PAGE_ACTION_REQUEST_EVENT, { detail: request }),
   );
-
+  console.log('====dispatchPageActionRequest', request);
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      pendingPageActionMap.delete(actionId);
+      pendingActionMap.delete(actionId);
       reject(new Error(`${action} 调用超时`));
     }, timeout);
 
-    pendingPageActionMap.set(actionId, { resolve, reject, timeoutId });
+    pendingActionMap.set(actionId, { resolve, reject, timeoutId });
   });
 }
 
 /**
  * 注册后台 → 页面 请求的处理器。
  */
-export function registerBackgroundActionHandler(
+export function registerPageBrigdeHandler(
   action: string,
   handler: BridgeHandler,
 ): void {
-  backgroundActionHandlers.set(action, handler);
+  bridgeHandlers.set(action, handler);
 }
 
 /**

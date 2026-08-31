@@ -39,7 +39,17 @@ const manifest = {
       "resources": [ "*.js", "*.css" ]
     },
   ],
-  permissions: ['sidePanel', 'storage', 'scripting'],
+  permissions: ['sidePanel', 'storage', 'scripting', 'tabs', 'activeTab'],
+  /**
+   * MV3 host 权限与 content_scripts.matches 解耦：
+   *  - content_scripts.matches = <all_urls> 只决定 content script 注入时机，不授予 host 访问权
+   *  - chrome.scripting.executeScript 访问 https://news.baidu.com/ 等非当前用户激活的 tab 时，
+   *    必须显式在 host_permissions 声明。否则报：
+   *    "Cannot access contents of url ... Extension manifest must request permission to access this host."
+   *  - activeTab 只在"用户点击扩展图标/上下文菜单/快捷键之后的那一个 tab"临时生效，
+   *    无法覆盖"页面主动发起请求 → background 回复 dispatchEvent"这种异步场景。
+   */
+  host_permissions: ['<all_urls>'],
 }
 
 export default manifest

@@ -1,6 +1,7 @@
 import { useControlledModal } from "@/hooks/useControlledPopup";
 import { Button } from "antd";
 import styles from './index.module.scss';
+import { dispatchPageActionRequest } from "@/pages/bridge";
 
 
 
@@ -8,11 +9,19 @@ function Home() {
 
   const [openModal, modalNode] = useControlledModal();
   const handleClick = () => {
-    // openModal({
-    //   title: "test",
-    //   children: <div>test</div>,
-    // });
-    console.log('====test');
+    openModal({
+      title: "test",
+      children: <div>test</div>,
+      onOk: async () => {
+        console.log('====onOk');
+        try {
+          const res = await dispatchPageActionRequest('test', ['hello']);
+          console.log('====res', res);
+        } catch (error) {
+          console.log('====error', error);
+        }
+      }
+    });
   };
 
   return (
