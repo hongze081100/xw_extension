@@ -1,5 +1,5 @@
 import { useControlledModal } from "@/hooks/useControlledPopup";
-import { Button } from "antd";
+import { Button, Modal } from "antd";
 import styles from './index.module.scss';
 import { dispatchPageActionRequest } from "@/pages/bridge";
 
@@ -17,6 +17,10 @@ function Home() {
         try {
           const res = await dispatchPageActionRequest('test', ['hello']);
           console.log('====res', res);
+          Modal.success({
+            title: 'success',
+            content: String(res || '--'),
+          });
         } catch (error) {
           console.log('====error', error);
         }
