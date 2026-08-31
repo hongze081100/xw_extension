@@ -38,7 +38,7 @@ const mounter = createModuleManager({
   //   console.log('=====route change');
   // },
 });
-
-document.removeEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
+  console.info('====DOMContentLoaded')
   mounter.start();
 });
