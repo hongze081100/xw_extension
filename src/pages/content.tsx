@@ -3,16 +3,12 @@ import { createModuleManager } from '@/utils/ModuleManager';
 import { App, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
-
 import Home from './modules/Home';
-import installBackgroundBridge from '@/utils/Bridge/installBackgroundBridge';
-
+import { installBridge } from './bridge';
 dayjs.locale('zh-cn');
 
-const backgroundBridge = installBackgroundBridge();
-void backgroundBridge;
-
 const COLOR_PRIMARY = '#1677ff';
+installBridge();
 
 const mounter = createModuleManager({
   routes: [

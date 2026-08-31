@@ -1,15 +1,23 @@
-import { BACKGROUND_REQUEST_EVENT, PAGE_RESPONSE_EVENT } from '@/constants/events';
-import { ChromeBridge, type ChromeBridgeHandler } from './ChromeBridge';
-import * as pageBridgeRequestHandlers from './pageBridgeRequestHandlers';
+import { 
+  handlePageActionRequest, 
+  handleBackgroundActionResponse
+ } from './bridge';
+import { PAGE_ACTION_REQUEST_EVENT, BACKGROUND_ACTION_RESPONSE_EVENT } from './bridge/constants';
+import type { BridgeRequest, BridgeResponse } from './bridge/types';
 
-export const pageBridge = new ChromeBridge({
-  source: 'page',
-  requestEvent: BACKGROUND_REQUEST_EVENT,
-  responseEvent: PAGE_RESPONSE_EVENT,
-});
-
-for (const [action, handler] of Object.entries(pageBridgeRequestHandlers)) {
-  if (typeof handler === 'function') {
-    pageBridge.register(action, handler as ChromeBridgeHandler);
+/**
+ * chrome.runtime.onMessage 监听器：分发页面请求与页面响应。
+ * 返回 true 保留消息通道（本实现通过 executeScript 回执，未使用 sendResponse）。
+ */
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type === PAGE_ACTION_REQUEST_EVENT) {
+    handlePageActionRequest(message as BridgeRequest, sender);
+    return true;
   }
-}
+  if (message?.type === BACKGROUND_ACTION_RESPONSE_EVENT) {
+    handleBackgroundActionResponse(message as BridgeResponse);
+    return true;
+  }
+  return true;
+});
+ 
