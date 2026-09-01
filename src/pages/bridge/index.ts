@@ -17,8 +17,34 @@ import {
 
 const pendingActionMap = new Map<string, PendingPageAction>();
 
-/** 后台 → 页面 请求的处理器注册表，按 action 名分发 */
-const bridgeHandlers = new Map<string, BridgeHandler>();
+/**
+ * 从页面发起一次后台调用：派发 page_action_request 事件（由 inject 转发给 background），
+ * 返回 Promise，在收到响应或超时后结算。
+ *
+ * @param action  要调用的方法名
+ * @param args    调用参数
+ * @param timeout 超时时间（ms），默认 30s
+ */
+export function dispatchPageActionRequest(
+  action: string,
+  args?: unknown[],
+  timeout: number = DEFAULT_ACTION_TIMEOUT,
+): Promise<unknown> {
+  const actionId = generateActionId();
+  const request: BridgeRequest = { actionId, action, args };
+  window.dispatchEvent(
+    new CustomEvent(PAGE_ACTION_REQUEST_EVENT, { detail: request }),
+  );
+  console.log('====dispatchPageActionRequest', request);
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      pendingActionMap.delete(actionId);
+      reject(new Error(`${action} 调用超时`));
+    }, timeout);
+
+    pendingActionMap.set(actionId, { resolve, reject, timeoutId });
+  });
+}
 
 /**
  * 处理后台返回的响应：根据 actionId 找到对应的 pending promise 并结算。
@@ -42,6 +68,9 @@ function handlePageActionResponse(e: Event): void {
     pending.reject(result);
   }
 }
+
+/** 后台 → 页面 请求的处理器注册表，按 action 名分发 */
+const bridgeHandlers = new Map<string, BridgeHandler>();
 
 /**
  * 处理后台发起的请求：按 action 查找 handler 执行，
@@ -75,35 +104,6 @@ function handleBackgroundActionRequest(e: Event): void {
     .catch((err: unknown) =>
       reply('reject', err instanceof Error ? err.message : String(err)),
     );
-}
-
-/**
- * 从页面发起一次后台调用：派发 page_action_request 事件（由 inject 转发给 background），
- * 返回 Promise，在收到响应或超时后结算。
- *
- * @param action  要调用的方法名
- * @param args    调用参数
- * @param timeout 超时时间（ms），默认 30s
- */
-export function dispatchPageActionRequest(
-  action: string,
-  args?: unknown[],
-  timeout: number = DEFAULT_ACTION_TIMEOUT,
-): Promise<unknown> {
-  const actionId = generateActionId();
-  const request: BridgeRequest = { actionId, action, args };
-  window.dispatchEvent(
-    new CustomEvent(PAGE_ACTION_REQUEST_EVENT, { detail: request }),
-  );
-  console.log('====dispatchPageActionRequest', request);
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      pendingActionMap.delete(actionId);
-      reject(new Error(`${action} 调用超时`));
-    }, timeout);
-
-    pendingActionMap.set(actionId, { resolve, reject, timeoutId });
-  });
 }
 
 /**

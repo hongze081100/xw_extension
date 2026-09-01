@@ -5,10 +5,16 @@ import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 import Home from './modules/Home';
 import { installBridge } from './bridge';
+import { ensureHooksInstalled, addFetchListener } from '../utils/network-hook';
 dayjs.locale('zh-cn');
 
 const COLOR_PRIMARY = '#1677ff';
 installBridge();
+ensureHooksInstalled();
+
+addFetchListener((context) => {
+  console.log('=====fetch', context);
+});
 
 const mounter = createModuleManager({
   routes: [
