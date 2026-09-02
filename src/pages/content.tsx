@@ -60,6 +60,7 @@ hook({
     this.meta.eventTarget.removeEventListener(type, listener);
   },
   onreadystatechange() {
+    console.log('====onreadystatechange', this.meta);
     if (this.meta.xhr.readyState === 4 && this.meta.xhr.status !== 0) {
       // handleResponse(xhr, xhrProxy);
       this.meta.eventTarget.dispatchEvent(new Event('readystatechange'));
