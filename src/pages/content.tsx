@@ -59,7 +59,7 @@ hook({
   removeEventListener(type, listener) {
     this.meta.eventTarget.removeEventListener(type, listener);
   },
-  onreadystatechange: function () {
+  onreadystatechange() {
     if (this.meta.xhr.readyState === 4 && this.meta.xhr.status !== 0) {
       // handleResponse(xhr, xhrProxy);
       this.meta.eventTarget.dispatchEvent(new Event('readystatechange'));
@@ -69,7 +69,6 @@ hook({
       // triggerListener(xhr, eventReadyStateChange);
       this.meta.eventTarget.dispatchEvent(new Event('readystatechange'));
     }
-    return true;
   },
 }, window);
 
